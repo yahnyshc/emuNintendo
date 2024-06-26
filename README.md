@@ -1,4 +1,5 @@
 # C++ Nintendo Switch Emulator
+Undertaking this project has been one of the most challenging yet exciting ventures for me. It involved extensive online research and learning from experienced developers and their emulator implementations. Building a software implementation of a CPU, buses, RAM, and screen rendering is fascinating, offering deep insights into the underlying workings of computer hardware and assembly instructions.
 
 ## Features
 - CPU Clock cycles are simulated and the final computation is done at the last cycle.
