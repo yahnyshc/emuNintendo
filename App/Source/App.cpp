@@ -1,6 +1,10 @@
-#include "Core/Core.h"
 
-int main()
-{
-	Core::PrintHelloWorld();
+#include <iostream>
+#include <sstream>
+
+#include "Core/bus.h"
+#include "Core/cpu.h"
+
+int main(){
+	return 0;
 }
