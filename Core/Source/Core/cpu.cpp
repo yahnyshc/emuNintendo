@@ -1,113 +1,12 @@
 #include "cpu.h"
 #include "bus.h"
-
+#include <chrono>
+#include <thread>
 // constructor
-cpu::cpu() {
-	instructions = {
-		// {Mnemonic, operation, addressmode, number of clock cycles}
-		{ "BRK", &cpu::BRK, &cpu::IMM, 7 },{ "ORA", &cpu::ORA, &cpu::IZX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },
-		{ "???", &cpu::NOP, &cpu::IMP, 3 },{ "ORA", &cpu::ORA, &cpu::ZP0, 3 },{ "ASL", &cpu::ASL, &cpu::ZP0, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },
-		{ "PHP", &cpu::PHP, &cpu::IMP, 3 },{ "ORA", &cpu::ORA, &cpu::IMM, 2 },{ "ASL", &cpu::ASL, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 2 },
-		{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "ORA", &cpu::ORA, &cpu::ABS, 4 },{ "ASL", &cpu::ASL, &cpu::ABS, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "BPL", &cpu::BPL, &cpu::REL, 2 },{ "ORA", &cpu::ORA, &cpu::IZY, 5 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },
-		{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "ORA", &cpu::ORA, &cpu::ZPX, 4 },{ "ASL", &cpu::ASL, &cpu::ZPX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "CLC", &cpu::CLC, &cpu::IMP, 2 },{ "ORA", &cpu::ORA, &cpu::ABY, 4 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "ORA", &cpu::ORA, &cpu::ABX, 4 },{ "ASL", &cpu::ASL, &cpu::ABX, 7 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "JSR", &cpu::JSR, &cpu::ABS, 6 },{ "AND", &cpu::AND, &cpu::IZX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },
-		{ "BIT", &cpu::BIT, &cpu::ZP0, 3 },{ "AND", &cpu::AND, &cpu::ZP0, 3 },{ "ROL", &cpu::ROL, &cpu::ZP0, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },
-		{ "PLP", &cpu::PLP, &cpu::IMP, 4 },{ "AND", &cpu::AND, &cpu::IMM, 2 },{ "ROL", &cpu::ROL, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 2 },
-		{ "BIT", &cpu::BIT, &cpu::ABS, 4 },{ "AND", &cpu::AND, &cpu::ABS, 4 },{ "ROL", &cpu::ROL, &cpu::ABS, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "BMI", &cpu::BMI, &cpu::REL, 2 },{ "AND", &cpu::AND, &cpu::IZY, 5 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },
-		{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "AND", &cpu::AND, &cpu::ZPX, 4 },{ "ROL", &cpu::ROL, &cpu::ZPX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "SEC", &cpu::SEC, &cpu::IMP, 2 },{ "AND", &cpu::AND, &cpu::ABY, 4 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "AND", &cpu::AND, &cpu::ABX, 4 },{ "ROL", &cpu::ROL, &cpu::ABX, 7 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "RTI", &cpu::RTI, &cpu::IMP, 6 },{ "EOR", &cpu::EOR, &cpu::IZX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },
-		{ "???", &cpu::NOP, &cpu::IMP, 3 },{ "EOR", &cpu::EOR, &cpu::ZP0, 3 },{ "LSR", &cpu::LSR, &cpu::ZP0, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },
-		{ "PHA", &cpu::PHA, &cpu::IMP, 3 },{ "EOR", &cpu::EOR, &cpu::IMM, 2 },{ "LSR", &cpu::LSR, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 2 },
-		{ "JMP", &cpu::JMP, &cpu::ABS, 3 },{ "EOR", &cpu::EOR, &cpu::ABS, 4 },{ "LSR", &cpu::LSR, &cpu::ABS, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "BVC", &cpu::BVC, &cpu::REL, 2 },{ "EOR", &cpu::EOR, &cpu::IZY, 5 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },
-		{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "EOR", &cpu::EOR, &cpu::ZPX, 4 },{ "LSR", &cpu::LSR, &cpu::ZPX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "CLI", &cpu::CLI, &cpu::IMP, 2 },{ "EOR", &cpu::EOR, &cpu::ABY, 4 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "EOR", &cpu::EOR, &cpu::ABX, 4 },{ "LSR", &cpu::LSR, &cpu::ABX, 7 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "RTS", &cpu::RTS, &cpu::IMP, 6 },{ "ADC", &cpu::ADC, &cpu::IZX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },
-		{ "???", &cpu::NOP, &cpu::IMP, 3 },{ "ADC", &cpu::ADC, &cpu::ZP0, 3 },{ "ROR", &cpu::ROR, &cpu::ZP0, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },
-		{ "PLA", &cpu::PLA, &cpu::IMP, 4 },{ "ADC", &cpu::ADC, &cpu::IMM, 2 },{ "ROR", &cpu::ROR, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 2 },
-		{ "JMP", &cpu::JMP, &cpu::IND, 5 },{ "ADC", &cpu::ADC, &cpu::ABS, 4 },{ "ROR", &cpu::ROR, &cpu::ABS, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "BVS", &cpu::BVS, &cpu::REL, 2 },{ "ADC", &cpu::ADC, &cpu::IZY, 5 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },
-		{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "ADC", &cpu::ADC, &cpu::ZPX, 4 },{ "ROR", &cpu::ROR, &cpu::ZPX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "SEI", &cpu::SEI, &cpu::IMP, 2 },{ "ADC", &cpu::ADC, &cpu::ABY, 4 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "ADC", &cpu::ADC, &cpu::ABX, 4 },{ "ROR", &cpu::ROR, &cpu::ABX, 7 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "STA", &cpu::STA, &cpu::IZX, 6 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "STY", &cpu::STY, &cpu::ZP0, 3 },{ "STA", &cpu::STA, &cpu::ZP0, 3 },{ "STX", &cpu::STX, &cpu::ZP0, 3 },{ "???", &cpu::XXX, &cpu::IMP, 3 },
-		{ "DEY", &cpu::DEY, &cpu::IMP, 2 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "TXA", &cpu::TXA, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 2 },
-		{ "STY", &cpu::STY, &cpu::ABS, 4 },{ "STA", &cpu::STA, &cpu::ABS, 4 },{ "STX", &cpu::STX, &cpu::ABS, 4 },{ "???", &cpu::XXX, &cpu::IMP, 4 },
-		{ "BCC", &cpu::BCC, &cpu::REL, 2 },{ "STA", &cpu::STA, &cpu::IZY, 6 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "STY", &cpu::STY, &cpu::ZPX, 4 },{ "STA", &cpu::STA, &cpu::ZPX, 4 },{ "STX", &cpu::STX, &cpu::ZPY, 4 },{ "???", &cpu::XXX, &cpu::IMP, 4 },
-		{ "TYA", &cpu::TYA, &cpu::IMP, 2 },{ "STA", &cpu::STA, &cpu::ABY, 5 },{ "TXS", &cpu::TXS, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 5 },
-		{ "???", &cpu::NOP, &cpu::IMP, 5 },{ "STA", &cpu::STA, &cpu::ABX, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },
-		{ "LDY", &cpu::LDY, &cpu::IMM, 2 },{ "LDA", &cpu::LDA, &cpu::IZX, 6 },{ "LDX", &cpu::LDX, &cpu::IMM, 2 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "LDY", &cpu::LDY, &cpu::ZP0, 3 },{ "LDA", &cpu::LDA, &cpu::ZP0, 3 },{ "LDX", &cpu::LDX, &cpu::ZP0, 3 },{ "???", &cpu::XXX, &cpu::IMP, 3 },
-		{ "TAY", &cpu::TAY, &cpu::IMP, 2 },{ "LDA", &cpu::LDA, &cpu::IMM, 2 },{ "TAX", &cpu::TAX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 2 },
-		{ "LDY", &cpu::LDY, &cpu::ABS, 4 },{ "LDA", &cpu::LDA, &cpu::ABS, 4 },{ "LDX", &cpu::LDX, &cpu::ABS, 4 },{ "???", &cpu::XXX, &cpu::IMP, 4 },
-		{ "BCS", &cpu::BCS, &cpu::REL, 2 },{ "LDA", &cpu::LDA, &cpu::IZY, 5 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 5 },
-		{ "LDY", &cpu::LDY, &cpu::ZPX, 4 },{ "LDA", &cpu::LDA, &cpu::ZPX, 4 },{ "LDX", &cpu::LDX, &cpu::ZPY, 4 },{ "???", &cpu::XXX, &cpu::IMP, 4 },
-		{ "CLV", &cpu::CLV, &cpu::IMP, 2 },{ "LDA", &cpu::LDA, &cpu::ABY, 4 },{ "TSX", &cpu::TSX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 4 },
-		{ "LDY", &cpu::LDY, &cpu::ABX, 4 },{ "LDA", &cpu::LDA, &cpu::ABX, 4 },{ "LDX", &cpu::LDX, &cpu::ABY, 4 },{ "???", &cpu::XXX, &cpu::IMP, 4 },
-		{ "CPY", &cpu::CPY, &cpu::IMM, 2 },{ "CMP", &cpu::CMP, &cpu::IZX, 6 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },
-		{ "CPY", &cpu::CPY, &cpu::ZP0, 3 },{ "CMP", &cpu::CMP, &cpu::ZP0, 3 },{ "DEC", &cpu::DEC, &cpu::ZP0, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },
-		{ "INY", &cpu::INY, &cpu::IMP, 2 },{ "CMP", &cpu::CMP, &cpu::IMM, 2 },{ "DEX", &cpu::DEX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 2 },
-		{ "CPY", &cpu::CPY, &cpu::ABS, 4 },{ "CMP", &cpu::CMP, &cpu::ABS, 4 },{ "DEC", &cpu::DEC, &cpu::ABS, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "BNE", &cpu::BNE, &cpu::REL, 2 },{ "CMP", &cpu::CMP, &cpu::IZY, 5 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },
-		{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "CMP", &cpu::CMP, &cpu::ZPX, 4 },{ "DEC", &cpu::DEC, &cpu::ZPX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "CLD", &cpu::CLD, &cpu::IMP, 2 },{ "CMP", &cpu::CMP, &cpu::ABY, 4 },{ "NOP", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "CMP", &cpu::CMP, &cpu::ABX, 4 },{ "DEC", &cpu::DEC, &cpu::ABX, 7 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "CPX", &cpu::CPX, &cpu::IMM, 2 },{ "SBC", &cpu::SBC, &cpu::IZX, 6 },{ "???", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },
-		{ "CPX", &cpu::CPX, &cpu::ZP0, 3 },{ "SBC", &cpu::SBC, &cpu::ZP0, 3 },{ "INC", &cpu::INC, &cpu::ZP0, 5 },{ "???", &cpu::XXX, &cpu::IMP, 5 },
-		{ "INX", &cpu::INX, &cpu::IMP, 2 },{ "SBC", &cpu::SBC, &cpu::IMM, 2 },{ "NOP", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::SBC, &cpu::IMP, 2 },
-		{ "CPX", &cpu::CPX, &cpu::ABS, 4 },{ "SBC", &cpu::SBC, &cpu::ABS, 4 },{ "INC", &cpu::INC, &cpu::ABS, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "BEQ", &cpu::BEQ, &cpu::REL, 2 },{ "SBC", &cpu::SBC, &cpu::IZY, 5 },{ "???", &cpu::XXX, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 8 },
-		{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "SBC", &cpu::SBC, &cpu::ZPX, 4 },{ "INC", &cpu::INC, &cpu::ZPX, 6 },{ "???", &cpu::XXX, &cpu::IMP, 6 },
-		{ "SED", &cpu::SED, &cpu::IMP, 2 },{ "SBC", &cpu::SBC, &cpu::ABY, 4 },{ "NOP", &cpu::NOP, &cpu::IMP, 2 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-		{ "???", &cpu::NOP, &cpu::IMP, 4 },{ "SBC", &cpu::SBC, &cpu::ABX, 4 },{ "INC", &cpu::INC, &cpu::ABX, 7 },{ "???", &cpu::XXX, &cpu::IMP, 7 },
-	};
-}
+cpu::cpu() {}
 
 // destructor
 cpu::~cpu() {}
-
-uint8_t cpu::read(uint16_t a) { return bus->read(a, false); }
-void cpu::write(uint16_t a, uint8_t d) { return bus->write(a, d); }
-
-// this is implemented in a behavioural fashion because the real hardware would execute this
-// in multiple clock cycle, however I am doing everying at one:  when the cycles == 0
-void cpu::clock() {
-	// this will be executed one the previous clock cycle has ended
-	if (cycles == 0) {
-		opcode = read(pc++); // reads one byte which will be used to index into instructions
-
-		// Get starting number of cycles
-		cycles = instructions[opcode].cycles;
-
-		uint8_t addr_mode_cycle = (this->*instructions[opcode].addrmode)();
-
-		uint8_t operation_cycle = (this->*instructions[opcode].operate)();
-
-		// if both address mode and operation require additional clock cycle
-		cycles += (addr_mode_cycle && operation_cycle);
-	}
-
-	cycles--;
-}
-
-// returns the value of a specific bit of the status register
-uint8_t cpu::get_flag(FLAGS f) {
-	return ((status & f) > 0) ? 1 : 0;
-}
-
-// sets or clears a specific bit of the status register
-void cpu::set_flag(FLAGS f, bool v) {
-	v ? status |= f : status &= ~f;
-}
 
 // implied addressing mode
 uint8_t cpu::IMP() {
@@ -448,62 +347,7 @@ uint8_t cpu::PLA() {
 	return 0;
 }
 
-// interupts
 
-void cpu::reset() {
-	a = 0; x = 0; y = 0;
-	stack_p = 0xFD; status = 0x00 | U;
-
-	// address to look for pc address
-	addr_abs = 0xFFFC;
-	uint16_t low = read(addr_abs + 0);
-	uint16_t high = read(addr_abs + 1);
-
-	pc = (high << 8) | low;
-
-	addr_rel = 0x0000; addr_abs = 0x0000; 
-	fetched = 0x00;
-
-	cycles = 8;
-}
-
-void cpu::irq() {
-	// if interupts not disabpled
-	if (get_flag(I) == 0) {
-		// Push the pc to the stack.
-		write(0x0100 + stack_p--, (pc >> 8) & 0x00FF);
-		write(0x0100 + stack_p--, pc & 0x00FF);
-
-		set_flag(B, 0); set_flag(U, 1); set_flag(I, 1);
-		write(0x0100 + stack_p--, status);
-
-		// interupt handler location
-		addr_abs = 0xFFFE;
-		uint16_t low = read(addr_abs + 0);
-		uint16_t high = read(addr_abs + 1);
-		pc = (high << 8) | low;
-
-		cycles = 7;
-	}
-}
-
-void cpu::nmi() {
-	// Push the pc to the stack.
-	write(0x0100 + stack_p--, (pc >> 8) & 0x00FF);
-	write(0x0100 + stack_p--, pc & 0x00FF);
-
-	set_flag(B, 0); set_flag(U, 1); set_flag(I, 1);
-	write(0x0100 + stack_p--, status);
-
-	// interupt handler location
-	addr_abs = 0xFFFE;
-	uint16_t low = read(addr_abs + 0);
-	uint16_t high = read(addr_abs + 1);
-	pc = (high << 8) | low;
-
-	// one more cycle compared to mascable interupt
-	cycles = 8;
-}
 
 // restore state before interupt
 uint8_t cpu::RTI() {
@@ -843,4 +687,226 @@ uint8_t cpu::TYA() {
 // for illegal opcodes
 uint8_t cpu::XXX() {
 	return 0;
+}
+
+uint8_t cpu::read(uint16_t a) { return bus->cpu_read(a, false); }
+void cpu::write(uint16_t a, uint8_t d) { return bus->cpu_write(a, d); }
+
+// this is implemented in a behavioural fashion because the real hardware would execute this
+// in multiple clock cycle, however I am doing everying at one:  when the cycles == 0
+void cpu::clock() {
+	// this will be executed one the previous clock cycle has ended
+	if (cycles == 0) {
+		opcode = read(pc++); // reads one byte which will be used to index into instructions
+
+		// Get starting number of cycles
+		cycles = instructions[opcode].cycles;
+
+		uint8_t addr_mode_cycle = (this->*instructions[opcode].addrmode)();
+
+		uint8_t operation_cycle = (this->*instructions[opcode].operate)();
+
+		// if both address mode and operation require additional clock cycle
+		cycles += (addr_mode_cycle && operation_cycle);
+	}
+
+	cycles--;
+}
+
+// returns the value of a specific bit of the status register
+uint8_t cpu::get_flag(FLAGS f) {
+	return ((status & f) > 0) ? 1 : 0;
+}
+
+// sets or clears a specific bit of the status register
+void cpu::set_flag(FLAGS f, bool v) {
+	v ? status |= f : status &= ~f;
+}
+
+void cpu::reset() {
+	a = 0; x = 0; y = 0;
+	stack_p = 0xFD; status = 0x00 | U;
+
+	// address to look for pc address
+	addr_abs = 0xFFFC;
+	uint16_t low = read(addr_abs + 0);
+	uint16_t high = read(addr_abs + 1);
+
+	pc = (high << 8) | low;
+
+	addr_rel = 0x0000; addr_abs = 0x0000;
+	fetched = 0x00;
+
+	cycles = 8;
+}
+
+void cpu::irq() {
+	// if interupts not disabpled
+	if (get_flag(I) == 0) {
+		// Push the pc to the stack.
+		write(0x0100 + stack_p--, (pc >> 8) & 0x00FF);
+		write(0x0100 + stack_p--, pc & 0x00FF);
+
+		set_flag(B, 0); set_flag(U, 1); set_flag(I, 1);
+		write(0x0100 + stack_p--, status);
+
+		// interupt handler location
+		addr_abs = 0xFFFE;
+		uint16_t low = read(addr_abs + 0);
+		uint16_t high = read(addr_abs + 1);
+		pc = (high << 8) | low;
+
+		cycles = 7;
+	}
+}
+
+void cpu::nmi() {
+	// Push the pc to the stack.
+	write(0x0100 + stack_p--, (pc >> 8) & 0x00FF);
+	write(0x0100 + stack_p--, pc & 0x00FF);
+
+	set_flag(B, 0); set_flag(U, 1); set_flag(I, 1);
+	write(0x0100 + stack_p--, status);
+
+	// interupt handler location
+	addr_abs = 0xFFFE;
+	uint16_t low = read(addr_abs + 0);
+	uint16_t high = read(addr_abs + 1);
+	pc = (high << 8) | low;
+
+	// one more cycle compared to mascable interupt
+	cycles = 8;
+}
+
+bool cpu::complete() {
+	return cycles == 0;
+}
+
+// This is the disassembly function. Its workings are not required for emulation.
+// It is merely a convenience function to turn the binary instruction code into
+// human readable form. Its included as part of the emulator because it can take
+// advantage of many of the CPUs internal operations to do this.
+std::map<uint16_t, std::string> cpu::disassemble(uint16_t nStart, uint16_t nStop)
+{
+	uint32_t addr = nStart;
+	uint8_t value = 0x00, lo = 0x00, hi = 0x00;
+	std::map<uint16_t, std::string> mapLines;
+	uint16_t line_addr = 0;
+
+	// A convenient utility to convert variables into
+	// hex strings because "modern C++"'s method with 
+	// streams is atrocious
+	auto hex = [](uint32_t n, uint8_t d)
+		{
+			std::string s(d, '0');
+			for (int i = d - 1; i >= 0; i--, n >>= 4)
+				s[i] = "0123456789ABCDEF"[n & 0xF];
+			return s;
+		};
+
+	// Starting at the specified address we read an instruction
+	// byte, which in turn yields information from the lookup table
+	// as to how many additional bytes we need to read and what the
+	// addressing mode is. I need this info to assemble human readable
+	// syntax, which is different depending upon the addressing mode
+
+	// As the instruction is decoded, a std::string is assembled
+	// with the readable output
+	while (addr <= (uint32_t)nStop)
+	{
+		line_addr = addr;
+
+		// Prefix line with instruction address
+		std::string sInst = "$" + hex(addr, 4) + ": ";
+
+		// Read instruction, and get its readable name
+		uint8_t opcode = bus->cpu_read(addr, true); addr++;
+		sInst += instructions[opcode].name + " ";
+
+		// Get oprands from desired locations, and form the
+		// instruction based upon its addressing mode. These
+		// routines mimmick the actual fetch routine of the
+		// 6502 in order to get accurate data as part of the
+		// instruction
+		if (instructions[opcode].addrmode == &cpu::IMP)
+		{
+			sInst += " {IMP}";
+		}
+		else if (instructions[opcode].addrmode == &cpu::IMM)
+		{
+			value = bus->cpu_read(addr, true); addr++;
+			sInst += "#$" + hex(value, 2) + " {IMM}";
+		}
+		else if (instructions[opcode].addrmode == &cpu::ZP0)
+		{
+			lo = bus->cpu_read(addr, true); addr++;
+			hi = 0x00;
+			sInst += "$" + hex(lo, 2) + " {ZP0}";
+		}
+		else if (instructions[opcode].addrmode == &cpu::ZPX)
+		{
+			lo = bus->cpu_read(addr, true); addr++;
+			hi = 0x00;
+			sInst += "$" + hex(lo, 2) + ", X {ZPX}";
+		}
+		else if (instructions[opcode].addrmode == &cpu::ZPY)
+		{
+			lo = bus->cpu_read(addr, true); addr++;
+			hi = 0x00;
+			sInst += "$" + hex(lo, 2) + ", Y {ZPY}";
+		}
+		else if (instructions[opcode].addrmode == &cpu::IZX)
+		{
+			lo = bus->cpu_read(addr, true); addr++;
+			hi = 0x00;
+			sInst += "($" + hex(lo, 2) + ", X) {IZX}";
+		}
+		else if (instructions[opcode].addrmode == &cpu::IZY)
+		{
+			lo = bus->cpu_read(addr, true); addr++;
+			hi = 0x00;
+			sInst += "($" + hex(lo, 2) + "), Y {IZY}";
+		}
+		else if (instructions[opcode].addrmode == &cpu::ABS)
+		{
+			lo = bus->cpu_read(addr, true); addr++;
+			hi = bus->cpu_read(addr, true); addr++;
+			sInst += "$" + hex((uint16_t)(hi << 8) | lo, 4) + " {ABS}";
+		}
+		else if (instructions[opcode].addrmode == &cpu::ABX)
+		{
+			lo = bus->cpu_read(addr, true); addr++;
+			hi = bus->cpu_read(addr, true); addr++;
+			sInst += "$" + hex((uint16_t)(hi << 8) | lo, 4) + ", X {ABX}";
+		}
+		else if (instructions[opcode].addrmode == &cpu::ABY)
+		{
+			lo = bus->cpu_read(addr, true); addr++;
+			hi = bus->cpu_read(addr, true); addr++;
+			sInst += "$" + hex((uint16_t)(hi << 8) | lo, 4) + ", Y {ABY}";
+		}
+		else if (instructions[opcode].addrmode == &cpu::IND)
+		{
+			lo = bus->cpu_read(addr, true); addr++;
+			hi = bus->cpu_read(addr, true); addr++;
+			sInst += "($" + hex((uint16_t)(hi << 8) | lo, 4) + ") {IND}";
+		}
+		else if (instructions[opcode].addrmode == &cpu::REL)
+		{
+			value = bus->cpu_read(addr, true); addr++;
+			sInst += "$" + hex(value, 2) + " [$" + hex(addr + (int8_t)value, 4) + "] {REL}";
+		}
+
+		// Add the formed string to a std::map, using the instruction's
+		// address as the key. This makes it convenient to look for later
+		// as the instructions are variable in length, so a straight up
+		// incremental index is not sufficient.
+
+		// std::cout << sInst << "\n";
+		// std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+		mapLines[line_addr] = sInst;
+	}
+
+	return mapLines;
 }
