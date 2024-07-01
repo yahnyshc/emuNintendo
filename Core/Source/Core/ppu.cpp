@@ -87,42 +87,46 @@ ppu::~ppu() {
 
 
 uint8_t ppu::cpu_read(uint16_t addr, bool read_only) {
-
+	uint8_t data = 0x00;
 	// control
-	if (addr == 0x0000)
-		return 0;
+	if (addr == 0x0000) {}
 	// mask
-	else if (addr == 0x0001)
-		return 0;
+	else if (addr == 0x0001) {}
 	// status
-	else if (addr == 0x0002)
-		return 0;
+	else if (addr == 0x0002) {
+		status.vertical_blank = 1;
+		data = (status.reg & 0xE0) | (ppu_data_buffer & 0x1F);
+		status.vertical_blank = 0;
+		address_latch = 0;
+	}
 	// OAM address
-	else if (addr == 0x0003)
-		return 0;
+	else if (addr == 0x0003) {}
 	// OAM Data
-	else if (addr == 0x0004)
-		return 0;
+	else if (addr == 0x0004) {}
 	// scroll
-	else if (addr == 0x0005)
-		return 0;
+	else if (addr == 0x0005) {}
 	// ppu address
-	else if (addr == 0x0006)
-		return 0;
+	else if (addr == 0x0006) {}
 	// ppu data
-	else if (addr == 0x0007)
-		return 0;
+	else if (addr == 0x0007) {
+		data = ppu_data_buffer;
+		ppu_data_buffer = ppu_read(ppu_address);
 
-	return 0x00;
+		// if in pallete range - we don't want read delay.
+		if (ppu_address >= 0x3F00) 
+			data = ppu_data_buffer;
+	}
+		
+	return data;
 }
 
 void ppu::cpu_write(uint16_t addr, uint8_t data) {
 	// control
 	if (addr == 0x0000)
-		return;
+		control.reg = data; 
 	// mask
 	else if (addr == 0x0001)
-		return;
+		mask.reg = data;
 	// status
 	else if (addr == 0x0002)
 		return;
@@ -137,10 +141,20 @@ void ppu::cpu_write(uint16_t addr, uint8_t data) {
 		return;
 	// ppu address
 	else if (addr == 0x0006)
-		return;
+		if (address_latch == 0) {
+			// set higher bits
+			ppu_address = (uint16_t)((data & 0x3F) << 8) | (ppu_address & 0x00FF);
+			address_latch = 1;
+		} else {
+			// set lower bits
+			ppu_address = (ppu_address & 0xFF00) | data;
+			address_latch = 0;
+		}
 	// ppu data
-	else if (addr == 0x0007)
-		return;
+	else if (addr == 0x0007) {
+		ppu_write(ppu_address, data);
+	}
+		
 }
 
 uint8_t ppu::ppu_read(uint16_t addr, bool read_only) {
@@ -148,13 +162,53 @@ uint8_t ppu::ppu_read(uint16_t addr, bool read_only) {
 	addr &= 0x3FFF;
 
 	if (ctrg->ppu_read(addr, data)) {}
-	return 0x00;
+	// pattern memory
+	else if (addr >= 0x0000 && addr <= 0x1FFF) {
+		data = pattern[(addr & 0x1000) >> 12][addr & 0x0FFF];
+	}
+	// name table memory
+	else if (addr >= 0x2000 && addr <= 0x3EFF) {
+
+	}
+	// pallete mamory
+	else if (addr >= 0x3F00 && addr <= 0x3FFF) {
+		addr &= 0x001F;
+		switch (addr) {
+			case 0x0010: addr = 0x0000; break;
+			case 0x0014: addr = 0x0004; break;
+			case 0x0018: addr = 0x0008; break;
+			case 0x001C: addr = 0x000C; break;
+		}
+		data = palette[addr];
+	}
+
+	return data;
 }
 
 void ppu::ppu_write(uint16_t addr, uint8_t data) {
 	addr &= 0x3FFF;
 
 	if (ctrg->ppu_write(addr, data)) {}
+	// pattern memory
+	else if (addr >= 0x0000 && addr <= 0x1FFF) {
+		// ussualy a ROM
+		pattern[(addr & 0x1000) >> 12][addr & 0x0FFF] = data;
+	}
+	// name table memory
+	else if (addr >= 0x2000 && addr <= 0x3EFF) {
+
+	}
+	// pallete mamory
+	else if (addr >= 0x3F00 && addr <= 0x3FFF) {
+		addr &= 0x001F;
+		switch (addr) {
+		case 0x0010: addr = 0x0000; break;
+		case 0x0014: addr = 0x0004; break;
+		case 0x0018: addr = 0x0008; break;
+		case 0x001C: addr = 0x000C; break;
+		}
+		palette[addr] = data;
+	}
 }
 
 void ppu::connect_cartridge(const std::shared_ptr<cartridge>& ctrg) {
@@ -188,6 +242,31 @@ olc::Sprite& ppu::GetNameTable(uint8_t i) {
 	return *sprNameTable[i];
 }
 
-olc::Sprite& ppu::GetPatternTable(uint8_t i) {
+olc::Sprite& ppu::GetPatternTable(uint8_t i, uint8_t palette) {
+	for (uint16_t nTileY = 0; nTileY < 16; nTileY++) {
+		for (uint16_t nTileX = 0; nTileX < 16; nTileX++) {
+			uint16_t nOffset = nTileY * 256 + nTileX * 16;
+			for (uint16_t row = 0; row < 8; row++) {
+				uint8_t tile_lsb = ppu_read(i * 0x1000 + nOffset + row + 0);
+				uint8_t tile_msb = ppu_read(i * 0x1000 + nOffset + row + 8);
+
+				for (uint16_t col = 0; col < 8; col++) {
+					uint8_t pixel = (tile_lsb & 0x01) + (tile_msb & 0x01);
+					tile_lsb >>= 1;
+					tile_msb >>= 1; 
+
+					sprPatternTable[i]->SetPixel(
+						nTileX * 8 + (7 - col),
+						nTileY * 8 + row,
+						GetColourFromPaletteRam(palette, pixel)
+					);
+				}
+			}
+		}
+	}
 	return *sprPatternTable[i];
+}
+
+olc::Pixel& ppu::GetColourFromPaletteRam(uint8_t palette, uint8_t pixel) {
+	return palScreen[ppu_read(0x3F00 + (palette << 2) + pixel) & 0x3F];
 }

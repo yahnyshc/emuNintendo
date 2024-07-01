@@ -84,16 +84,19 @@ public:
 	void irq();
 	// Non-maskable interrupt (can never be disabled)
 	void nmi();
+	// helper funcxtion
+	void interupt(bool maskable);
 
 	// to be able to fetch data
 	uint8_t fetch();
 	// storage for fetched data
 	uint8_t fetched = 0x00;
-
+	uint16_t temp = 0x0000;
 	uint16_t addr_abs = 0x0000;
 	uint16_t addr_rel = 0x00;
 	uint8_t opcode = 0x00;
 	uint8_t cycles = 0;
+	uint32_t clock_count = 0;	   // A global accumulation of the number of clocks
 
 	// Indicates the current instruction has completed by returning true. This is
 	// a utility function to enable "step-by-step" execution, without manually 

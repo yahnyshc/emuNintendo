@@ -78,6 +78,9 @@ private:
 	bool bEmulationRun = false;
 	float fResidualTime = 0.0f;
 
+	uint8_t nSelectedPalette = 0x00;
+
+
 private:
 	// Support Utilities
 	std::map<uint16_t, std::string> mapAsm;
@@ -224,9 +227,24 @@ private:
 
 		if (GetKey(olc::Key::SPACE).bPressed) bEmulationRun = !bEmulationRun;
 		if (GetKey(olc::Key::R).bPressed) nes.reset();
+		if (GetKey(olc::Key::P).bPressed) (++nSelectedPalette) &= 0x07;
 
 		DrawCpu(516, 2);
 		DrawCode(516, 72, 26);
+
+		// Draw Palettes & Pattern Tables ==============================================
+		const int nSwatchSize = 6;
+		for (int p = 0; p < 8; p++) // For each palette
+			for (int s = 0; s < 4; s++) // For each index
+				FillRect(516 + p * (nSwatchSize * 5) + s * nSwatchSize, 340,
+					nSwatchSize, nSwatchSize, nes.olc2C02.GetColourFromPaletteRam(p, s));
+
+		// Draw selection reticule around selected palette
+		DrawRect(516 + nSelectedPalette * (nSwatchSize * 5) - 1, 339, (nSwatchSize * 4), nSwatchSize, olc::WHITE);
+
+		// Generate Pattern Tables
+		DrawSprite(516, 348, &nes.olc2C02.GetPatternTable(0, nSelectedPalette));
+		DrawSprite(648, 348, &nes.olc2C02.GetPatternTable(1, nSelectedPalette));
 
 		DrawSprite(0, 0, &nes.olc2C02.GetScreen(), 2);
 		return true;
