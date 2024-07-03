@@ -13,9 +13,11 @@ public:
 	~ppu();
 
 public:
-	uint8_t name_table[2][KB];
-	uint8_t palette[32];
-	uint8_t pattern[2][4*KB];
+	uint8_t name_table[2][KB] = {};
+	uint8_t palette[32] = {};
+	uint8_t pattern[2][4 * KB] = {};
+
+	bool nminterupt = false;
 
 
 	uint8_t cpu_read(uint16_t addr, bool read_only = false);
@@ -88,7 +90,33 @@ private:
 		uint8_t reg;
 	} control;
 
+	union loopy_register {
+		struct {
+
+			uint16_t coarse_x : 5;
+			uint16_t coarse_y : 5;
+			uint16_t nametable_x : 1;
+			uint16_t nametable_y : 1;
+			uint16_t fine_y : 3;
+			uint16_t unused : 1;
+		};
+		uint16_t reg = 0x0000;
+	};
+
+	loopy_register vram_addr;
+	loopy_register tram_addr;
+
+	uint8_t fine_x = 0x00;
+
 	uint8_t address_latch = 0x00;
 	uint8_t ppu_data_buffer = 0x00;
-	uint16_t ppu_address = 0x0000;
+
+	uint8_t backg_next_tile_id = 0x00;
+	uint8_t backg_next_tile_attrib = 0x00;
+	uint8_t backg_next_tile_lsb = 0x00;
+	uint8_t backg_next_tile_msb = 0x00;
+	uint16_t backg_shifter_pattern_lo = 0x0000;
+	uint16_t backg_shifter_pattern_hi = 0x0000;
+	uint16_t backg_shifter_attrib_lo = 0x0000;
+	uint16_t backg_shifter_attrib_hi = 0x0000;
 };

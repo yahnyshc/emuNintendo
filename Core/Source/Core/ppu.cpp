@@ -94,7 +94,7 @@ uint8_t ppu::cpu_read(uint16_t addr, bool read_only) {
 	else if (addr == 0x0001) {}
 	// status
 	else if (addr == 0x0002) {
-		status.vertical_blank = 1;
+		//status.vertical_blank = 1;
 		data = (status.reg & 0xE0) | (ppu_data_buffer & 0x1F);
 		status.vertical_blank = 0;
 		address_latch = 0;
@@ -110,11 +110,12 @@ uint8_t ppu::cpu_read(uint16_t addr, bool read_only) {
 	// ppu data
 	else if (addr == 0x0007) {
 		data = ppu_data_buffer;
-		ppu_data_buffer = ppu_read(ppu_address);
+		ppu_data_buffer = ppu_read(vram_addr.reg);
 
 		// if in pallete range - we don't want read delay.
-		if (ppu_address >= 0x3F00) 
+		if (vram_addr.reg >= 0x3F00)
 			data = ppu_data_buffer;
+		vram_addr.reg += (control.increment_mode ? 32 : 1);
 	}
 		
 	return data;
@@ -122,8 +123,11 @@ uint8_t ppu::cpu_read(uint16_t addr, bool read_only) {
 
 void ppu::cpu_write(uint16_t addr, uint8_t data) {
 	// control
-	if (addr == 0x0000)
-		control.reg = data; 
+	if (addr == 0x0000) {
+		control.reg = data;
+		tram_addr.nametable_x = control.nametable_x;
+		tram_addr.nametable_y = control.nametable_y;
+	}
 	// mask
 	else if (addr == 0x0001)
 		mask.reg = data;
@@ -137,22 +141,36 @@ void ppu::cpu_write(uint16_t addr, uint8_t data) {
 	else if (addr == 0x0004)
 		return;
 	// scroll
-	else if (addr == 0x0005)
-		return;
-	// ppu address
-	else if (addr == 0x0006)
+	else if (addr == 0x0005) {
 		if (address_latch == 0) {
-			// set higher bits
-			ppu_address = (uint16_t)((data & 0x3F) << 8) | (ppu_address & 0x00FF);
+			fine_x = data & 0x07;
+			tram_addr.coarse_x = data >> 3;
 			address_latch = 1;
-		} else {
-			// set lower bits
-			ppu_address = (ppu_address & 0xFF00) | data;
+		}
+		else {
+			tram_addr.fine_y = data & 0x07;
+			tram_addr.coarse_y = data >> 3;
 			address_latch = 0;
 		}
+	}
+	// ppu address
+	else if (addr == 0x0006) {
+		if (address_latch == 0) {
+			// set higher bits
+			tram_addr.reg = (uint16_t)((data & 0x3F) << 8) | (tram_addr.reg & 0x00FF);
+			address_latch = 1;
+		}
+		else {
+			// set lower bits
+			tram_addr.reg = (tram_addr.reg & 0xFF00) | data;
+			vram_addr = tram_addr;
+			address_latch = 0;
+		}
+	}
 	// ppu data
 	else if (addr == 0x0007) {
-		ppu_write(ppu_address, data);
+		ppu_write(vram_addr.reg, data);
+		vram_addr.reg += (control.increment_mode ? 32 : 1);
 	}
 		
 }
@@ -168,7 +186,30 @@ uint8_t ppu::ppu_read(uint16_t addr, bool read_only) {
 	}
 	// name table memory
 	else if (addr >= 0x2000 && addr <= 0x3EFF) {
+		addr &= 0x0FFF;
 
+		if (ctrg->mirror == cartridge::MIRROR::VERTICAL) {
+			// Vertical
+			if (addr >= 0x0000 && addr <= 0x03FF)
+				data = name_table[0][addr & 0x03FF];
+			if (addr >= 0x0400 && addr <= 0x07FF)
+				data = name_table[1][addr & 0x03FF];
+			if (addr >= 0x0800 && addr <= 0x0BFF)
+				data = name_table[0][addr & 0x03FF];
+			if (addr >= 0x0C00 && addr <= 0x0FFF)
+				data = name_table[1][addr & 0x03FF];
+		}
+		else if (ctrg->mirror == cartridge::MIRROR::HORIZONTAL) {
+			// Horizontal
+			if (addr >= 0x0000 && addr <= 0x03FF)
+				data = name_table[0][addr & 0x03FF];
+			if (addr >= 0x0400 && addr <= 0x07FF)
+				data = name_table[0][addr & 0x03FF];
+			if (addr >= 0x0800 && addr <= 0x0BFF)
+				data = name_table[1][addr & 0x03FF];
+			if (addr >= 0x0C00 && addr <= 0x0FFF)
+				data = name_table[1][addr & 0x03FF];
+		}
 	}
 	// pallete mamory
 	else if (addr >= 0x3F00 && addr <= 0x3FFF) {
@@ -196,7 +237,31 @@ void ppu::ppu_write(uint16_t addr, uint8_t data) {
 	}
 	// name table memory
 	else if (addr >= 0x2000 && addr <= 0x3EFF) {
-
+		addr &= 0x0FFF;
+		if (ctrg->mirror == cartridge::MIRROR::VERTICAL)
+		{
+			// Vertical
+			if (addr >= 0x0000 && addr <= 0x03FF)
+				name_table[0][addr & 0x03FF] = data;
+			if (addr >= 0x0400 && addr <= 0x07FF)
+				name_table[1][addr & 0x03FF] = data;
+			if (addr >= 0x0800 && addr <= 0x0BFF)
+				name_table[0][addr & 0x03FF] = data;
+			if (addr >= 0x0C00 && addr <= 0x0FFF)
+				name_table[1][addr & 0x03FF] = data;
+		}
+		else if (ctrg->mirror == cartridge::MIRROR::HORIZONTAL)
+		{
+			// Horizontal
+			if (addr >= 0x0000 && addr <= 0x03FF)
+				name_table[0][addr & 0x03FF] = data;
+			if (addr >= 0x0400 && addr <= 0x07FF)
+				name_table[0][addr & 0x03FF] = data;
+			if (addr >= 0x0800 && addr <= 0x0BFF)
+				name_table[1][addr & 0x03FF] = data;
+			if (addr >= 0x0C00 && addr <= 0x0FFF)
+				name_table[1][addr & 0x03FF] = data;
+		}
 	}
 	// pallete mamory
 	else if (addr >= 0x3F00 && addr <= 0x3FFF) {
@@ -217,13 +282,154 @@ void ppu::connect_cartridge(const std::shared_ptr<cartridge>& ctrg) {
 
 void ppu::clock() {
 
+	auto incr_scroll_x = [&]() {
+		if (mask.render_background || mask.render_sprites) {
+			if (vram_addr.coarse_x == 31) {
+				// wrap address round
+				vram_addr.coarse_x = 0;
+				// flip target nametable bit
+				vram_addr.nametable_x = ~vram_addr.nametable_x;
+			}
+			else {
+				vram_addr.coarse_x++;
+			}
+		}
+	};
+
+	auto incr_scroll_y = [&]() {
+		if (mask.render_background || mask.render_sprites) {
+			if (vram_addr.fine_y < 7) {
+				vram_addr.fine_y++;
+			}
+			else {
+				vram_addr.fine_y = 0;
+				// check if we need to swap vertical nametable targets
+				if (vram_addr.coarse_y == 29) {
+					vram_addr.coarse_y = 0;
+					vram_addr.nametable_y = ~vram_addr.nametable_y;
+				}
+				else if (vram_addr.coarse_y == 31) {
+					vram_addr.coarse_y = 0;
+				}
+				else {
+					vram_addr.coarse_y++;
+				}
+			}
+		}
+	};
+
+	auto reset_address_x = [&]() {
+		if (mask.render_background || mask.render_sprites) {
+			vram_addr.nametable_x = tram_addr.nametable_x;
+			vram_addr.coarse_x = tram_addr.coarse_x;
+		}
+	};
+
+	auto reset_address_y = [&]() {
+		if (mask.render_background || mask.render_sprites) {
+			vram_addr.fine_y = tram_addr.fine_y;
+			vram_addr.nametable_y = tram_addr.nametable_y;
+			vram_addr.coarse_y = tram_addr.coarse_y;
+		}
+	};
+
+	auto load_backg_shifters = [&]() {
+		backg_shifter_pattern_lo = (backg_shifter_pattern_lo & 0xFF00) | backg_next_tile_lsb;
+		backg_shifter_pattern_hi = (backg_shifter_pattern_hi & 0xFF00) | backg_next_tile_msb;
+		backg_shifter_attrib_lo = (backg_shifter_attrib_lo & 0xFF00) | ((backg_next_tile_attrib & 0b01) ? 0xFF : 0x00);
+		backg_shifter_attrib_hi = (backg_shifter_attrib_hi & 0xFF00) | ((backg_next_tile_attrib & 0b10) ? 0xFF : 0x00);
+	};
+
+	auto update_shifters = [&]() {
+		if (mask.render_background) {
+			// shifting background tile pattern row
+			backg_shifter_pattern_lo <<= 1;
+			backg_shifter_pattern_hi <<= 1;
+			// shifting palette attributes by 1
+			backg_shifter_attrib_lo <<= 1;
+			backg_shifter_attrib_hi <<= 1;
+		}
+	};
+
+	if (scanline >= -1 && scanline < 240) {
+		// we are back to the screen area
+		if (scanline == -1 && cycle == 1) {
+			status.vertical_blank = 0;
+		}
+
+		if ((cycle >= 2 && cycle < 258) || (cycle >= 321 && cycle < 338)) {
+			update_shifters();
+			switch ((cycle - 1) % 8) {
+			case 0:
+				load_backg_shifters();
+				backg_next_tile_id = ppu_read(0x2000 | (vram_addr.reg & 0x0FFF));
+				break;
+			case 2:
+				backg_next_tile_attrib = ppu_read(0x23C0 | (vram_addr.nametable_y << 11)
+					| (vram_addr.nametable_x << 10)
+					| ((vram_addr.coarse_y >> 2) << 3)
+					| (vram_addr.coarse_x >> 2));
+				if (vram_addr.coarse_y & 0x02) backg_next_tile_attrib >>= 4;
+				if (vram_addr.coarse_x & 0x02) backg_next_tile_attrib >>= 2;
+				backg_next_tile_attrib &= 0x03;
+				break;
+			case 4:
+				backg_next_tile_lsb = ppu_read((control.pattern_background << 12)
+					+ ((uint16_t)backg_next_tile_id << 4)
+					+ (vram_addr.fine_y) + 0);
+				break;
+			case 6:
+				backg_next_tile_msb = ppu_read((control.pattern_background << 12)
+					+ ((uint16_t)backg_next_tile_id << 4)
+					+ (vram_addr.fine_y) + 8);
+				break;
+			case 7:
+				incr_scroll_x();
+				break;
+			}
+		}
+
+		if (cycle == 256) {
+			incr_scroll_y();
+		}
+		
+		if (cycle == 257) {
+			reset_address_x();
+		}
+
+		if (scanline == -1 && cycle >= 280 && cycle < 305) {
+			reset_address_y();
+		}
+	}
+
+	// trigger interupt when we enter area outside of the screen
+	if (scanline == 241 && cycle == 1) {
+		status.vertical_blank = 1;
+		if (control.enable_nmi) 
+			nminterupt = true;
+	}
+
+	uint8_t backg_pixel = 0x00;
+	uint8_t backg_palette = 0x00;
+
+	if (mask.render_background) {
+		uint16_t bit_mux = 0x8000 >> fine_x;
+
+		uint8_t p0_pixel = (backg_shifter_pattern_lo & bit_mux) > 0;
+		uint8_t p1_pixel = (backg_shifter_pattern_hi & bit_mux) > 0;
+		backg_pixel = (p1_pixel << 1) | p0_pixel;
+
+		uint8_t backg_pal0 = (backg_shifter_attrib_lo & bit_mux) > 0;
+		uint8_t backg_pal1 = (backg_shifter_attrib_hi & bit_mux) > 0;
+		backg_palette = (backg_pal1 << 1) | backg_pal0;
+	}
+
 	// Fake some noise for now
-	sprScreen->SetPixel(cycle - 1, scanline, palScreen[(rand() % 2) ? 0x3F : 0x30]);
+	sprScreen->SetPixel(cycle - 1, scanline, GetColourFromPaletteRam(backg_palette, backg_pixel));
 
 	// Advance renderer - it never stops, it's relentless
 	cycle++;
-	if (cycle >= 341)
-	{
+	if (cycle >= 341) {
 		cycle = 0;
 		scanline++;
 		if (scanline >= 261)

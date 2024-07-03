@@ -21,7 +21,7 @@ void bus::cpu_write(uint16_t addr, uint8_t data){
 	else if (addr >= 0x0000 && addr <= 0x1FFF) 
 		ram[addr & 0x07FF] = data;
 	else if (addr >= 0x2000 && addr <= 0x3FFF) 
-		olc2C02.cpu_write(addr & 0x07FF, data); 
+		olc2C02.cpu_write(addr & 0x0007, data);
 }
 
 // cpu reads data from the RAM
@@ -39,7 +39,7 @@ uint8_t bus::cpu_read(uint16_t addr, bool read_only) {
 		return olc2C02.cpu_read(addr & 0x0007, read_only);
 
 	// if reading outside the range
-	return 0x00;
+	return data;
 }
 
 void bus::insert_cartridge(const std::shared_ptr<cartridge>& ctrg) {
@@ -55,6 +55,13 @@ void bus::reset() {
 void bus::clock() {
 	olc2C02.clock();
 	// The CPU runs 3 times slower than the PPU
-	if (clock_counter++ % 3 == 0)
+	if (clock_counter % 3 == 0)
 		olc6502.clock();
+
+	if (olc2C02.nminterupt) {
+		olc2C02.nminterupt = false;
+		olc6502.nmi();
+	}
+
+	clock_counter++;
 }

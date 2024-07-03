@@ -35,6 +35,3 @@ public:
 	// will call to perform one system tick of the emulation
 	void clock();
 };
-
-
-

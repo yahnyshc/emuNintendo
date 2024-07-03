@@ -46,7 +46,7 @@ void cpu::interupt(bool maskable) {
 	stack_p--;
 
 	// read new program counter location
-	addr_abs = 0xFFFE; // fixed address
+	addr_abs = maskable ? 0xFFFE : 0xFFFA; // fixed address
 	pc = (read(addr_abs + 1) << 8) | read(addr_abs + 0);
 
 	cycles = 7 + (maskable ? 0 : 1);
@@ -209,10 +209,10 @@ uint8_t cpu::IZX() {
 	uint16_t t = read(pc);
 	pc++;
 
-	uint16_t lo = read((uint16_t)(t + (uint16_t)x) & 0x00FF);
-	uint16_t hi = read((uint16_t)(t + (uint16_t)x + 1) & 0x00FF);
+	uint16_t low = read((uint16_t)(t + (uint16_t)x) & 0x00FF);
+	uint16_t high = read((uint16_t)(t + (uint16_t)x + 1) & 0x00FF);
 
-	addr_abs = (hi << 8) | lo;
+	addr_abs = (high << 8) | low;
 
 	return 0;
 }
@@ -383,7 +383,7 @@ uint8_t cpu::BNE() {
 }
 
 // branch if positive
-uint8_t cpu::BPL() {
+uint8_t cpu::BPL() { 
 	// not equal if result of last cpu instr was positive
 	if ( ! get_flag(N) ) {
 		cycles++;
